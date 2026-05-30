@@ -8,41 +8,26 @@ use Mpdf\Config\FontVariables;
 /**
  * Builds and streams the tearsheet PDF for a given WooCommerce product.
  *
- * PDF layout mirrors the Quatrain tearsheet design:
- *  - Centered brand/collection name at top
- *  - Two-column body: specs on the left, product image on the right
+ * All spec data is read from ACF custom fields (see class-tearsheet-acf-fields.php).
+ *
+ * PDF layout:
+ *  - Centered brand / collection name at top
+ *  - Two-column body: specs left, featured image right
  *  - Footer with contact email and website
  */
 class Tearsheet_Generator {
 
     private WC_Product $product;
+    private int        $post_id;
 
-    // Attribute slug → tearsheet label mapping.
-    // Adjust slugs to match your WooCommerce attribute names.
-    private const ATTR_MAP = [
-        'width'           => 'Width',
-        'depth'           => 'Depth',
-        'height'          => 'Height',
-        'seat-height'     => 'Seat Height',
-        'seat_height'     => 'Seat Height',
-        'material'        => null, // handled as a dedicated section
-        'finish'          => null, // handled as a dedicated section
-        'pa_width'        => 'Width',
-        'pa_depth'        => 'Depth',
-        'pa_height'       => 'Height',
-        'pa_seat-height'  => 'Seat Height',
-        'pa_seat_height'  => 'Seat Height',
-        'pa_material'     => null,
-        'pa_finish'       => null,
-    ];
-
-    // Brand / contact info — edit to match your site.
-    private const BRAND_NAME   = 'Quatrain';
-    private const BRAND_EMAIL  = 'info@fournircollections.com';
-    private const BRAND_SITE   = 'www.fournircollections.com';
+    // Edit these to match your site.
+    private const BRAND_NAME  = 'Quatrain';
+    private const BRAND_EMAIL = 'info@fournircollections.com';
+    private const BRAND_SITE  = 'www.fournircollections.com';
 
     public function __construct( WC_Product $product ) {
         $this->product = $product;
+        $this->post_id = $product->get_id();
     }
 
     // ------------------------------------------------------------------
@@ -55,81 +40,63 @@ class Tearsheet_Generator {
         $mpdf->WriteHTML( $this->html(), 2 );
 
         $filename = sanitize_title( $this->product->get_name() ) . '-tearsheet.pdf';
-        $mpdf->Output( $filename, 'D' ); // 'D' = force download
+        $mpdf->Output( $filename, 'D' );
         exit;
     }
 
     // ------------------------------------------------------------------
-    // mPDF initialisation
+    // mPDF
     // ------------------------------------------------------------------
 
     private function make_mpdf(): Mpdf {
-        $default_config  = ( new ConfigVariables() )->getDefaults();
-        $font_dirs       = $default_config['fontDir'];
-
+        $default_config      = ( new ConfigVariables() )->getDefaults();
         $default_font_config = ( new FontVariables() )->getDefaults();
-        $font_data           = $default_font_config['fontdata'];
 
         return new Mpdf( [
-            'mode'              => 'utf-8',
-            'format'            => 'A4',
-            'margin_top'        => 18,
-            'margin_bottom'     => 20,
-            'margin_left'       => 18,
-            'margin_right'      => 18,
-            'fontDir'           => array_merge( $font_dirs, [ TEARSHEET_DIR . 'assets/fonts/' ] ),
-            'fontdata'          => $font_data,
-            'default_font'      => 'helvetica',
-            'tempDir'           => sys_get_temp_dir() . '/tearsheet_mpdf',
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+            'margin_top'   => 18,
+            'margin_bottom'=> 20,
+            'margin_left'  => 18,
+            'margin_right' => 18,
+            'fontDir'      => array_merge(
+                $default_config['fontDir'],
+                [ TEARSHEET_DIR . 'assets/fonts/' ]
+            ),
+            'fontdata'     => $default_font_config['fontdata'],
+            'default_font' => 'helvetica',
+            'tempDir'      => sys_get_temp_dir() . '/tearsheet_mpdf',
         ] );
     }
 
     // ------------------------------------------------------------------
-    // Data helpers
+    // ACF data helpers
     // ------------------------------------------------------------------
 
-    /** Returns a readable attribute value or empty string. */
-    private function attr( string ...$slugs ): string {
-        foreach ( $slugs as $slug ) {
-            // Try global PA attribute first.
-            $value = $this->product->get_attribute( $slug );
-            if ( $value !== '' ) {
-                return $value;
-            }
-            // Try without pa_ prefix.
-            $alt = str_replace( 'pa_', '', $slug );
-            $value = $this->product->get_attribute( $alt );
-            if ( $value !== '' ) {
-                return $value;
-            }
-        }
-        return '';
-    }
-
-    /** Returns the product's featured image URL (full size). */
-    private function image_url(): string {
-        $id = $this->product->get_image_id();
-        if ( ! $id ) {
+    /** Returns the ACF field value as a trimmed string, or '' if empty. */
+    private function f( string $field_name ): string {
+        if ( ! function_exists( 'get_field' ) ) {
             return '';
         }
-        $src = wp_get_attachment_image_src( $id, 'large' );
+        return trim( (string) get_field( $field_name, $this->post_id ) );
+    }
+
+    /** Returns the product's featured image URL. */
+    private function image_url(): string {
+        $id  = $this->product->get_image_id();
+        $src = $id ? wp_get_attachment_image_src( $id, 'large' ) : false;
         return $src ? $src[0] : '';
     }
 
-    /** Resolves the collection / brand name from a custom taxonomy or meta. */
+    /**
+     * Resolves collection / brand name.
+     * Tries common brand taxonomies, then the ACF field, then the constant.
+     */
     private function collection(): string {
-        // Try product_brand taxonomy (used by many WC brand plugins).
         foreach ( [ 'product_brand', 'pwb-brand', 'yith_product_brand' ] as $tax ) {
-            $terms = get_the_terms( $this->product->get_id(), $tax );
+            $terms = get_the_terms( $this->post_id, $tax );
             if ( $terms && ! is_wp_error( $terms ) ) {
                 return esc_html( $terms[0]->name );
-            }
-        }
-        // Fallback: custom meta _brand or _collection.
-        foreach ( [ '_brand', '_collection', 'brand', 'collection' ] as $key ) {
-            $v = get_post_meta( $this->product->get_id(), $key, true );
-            if ( $v ) {
-                return esc_html( $v );
             }
         }
         return self::BRAND_NAME;
@@ -210,7 +177,7 @@ class Tearsheet_Generator {
 
         .section-body {
             font-size: 10pt;
-            line-height: 1.5;
+            line-height: 1.6;
         }
 
         .footer {
@@ -234,64 +201,60 @@ class Tearsheet_Generator {
         $collection = $this->collection();
         $image_url  = $this->image_url();
 
-        // Dimensions
-        $width       = $this->attr( 'pa_width',       'width' );
-        $depth       = $this->attr( 'pa_depth',       'depth' );
-        $height      = $this->attr( 'pa_height',      'height' );
-        $seat_height = $this->attr( 'pa_seat-height', 'pa_seat_height', 'seat-height', 'seat_height' );
+        // ACF fields.
+        $details     = $this->f( 'fournir_details' );
+        $material    = $this->f( 'fournir_material' );
+        $finish      = $this->f( 'fournir_finish' );
+        $width       = $this->f( 'fournir_width' );
+        $depth       = $this->f( 'fournir_depth' );
+        $height      = $this->f( 'fournir_height' );
+        $seat_height = $this->f( 'fournir_seat_height' );
+        $com         = $this->f( 'fournir_com' );
+        $col         = $this->f( 'fournir_col' );
+        $lead_time   = $this->f( 'fournir_lead_time' );
 
-        // Specs
-        $material   = $this->attr( 'pa_material',     'material' );
-        $finish     = $this->attr( 'pa_finish',        'finish', 'pa_finish-shown', 'finish-shown', 'finish_shown' );
-        $com        = $this->attr( 'pa_com',           'com' );
-        $col        = $this->attr( 'pa_col',           'col' );
-        $details    = $this->attr( 'pa_details',       'details' );
-        $lead_time  = $this->attr( 'pa_lead-time',     'pa_lead_time', 'lead-time', 'lead_time', 'estimated-lead-time' );
+        // Build each section only if data exists.
+        $specs_html = '';
 
-        // Fall back: use short description for details if attribute is empty.
-        if ( $details === '' ) {
-            $details = wp_strip_all_tags( $this->product->get_short_description() );
+        if ( $details ) {
+            $specs_html .= $this->section( 'Details', esc_html( $details ) );
         }
 
-        // Build dimensions block.
-        $dim_lines = '';
-        if ( $width )       { $dim_lines .= 'Width: ' . esc_html( $width ) . '<br>'; }
-        if ( $depth )       { $dim_lines .= 'Depth: ' . esc_html( $depth ) . '<br>'; }
-        if ( $height )      { $dim_lines .= 'Height: ' . esc_html( $height ) . '<br>'; }
-        if ( $seat_height ) { $dim_lines .= 'Seat Height: ' . esc_html( $seat_height ) . '<br>'; }
+        if ( $material ) {
+            $specs_html .= $this->section( 'Material', esc_html( $material ) );
+        }
 
-        // Build upholstery block.
+        if ( $finish ) {
+            $specs_html .= $this->section( 'Finish Shown', esc_html( $finish ) );
+        }
+
+        $dim_lines = '';
+        if ( $width )       { $dim_lines .= 'Width: '       . esc_html( $width )       . '<br>'; }
+        if ( $depth )       { $dim_lines .= 'Depth: '       . esc_html( $depth )       . '<br>'; }
+        if ( $height )      { $dim_lines .= 'Height: '      . esc_html( $height )      . '<br>'; }
+        if ( $seat_height ) { $dim_lines .= 'Seat Height: ' . esc_html( $seat_height ) . '<br>'; }
+        if ( $dim_lines ) {
+            $specs_html .= $this->section( 'Standard Dimensions', $dim_lines );
+        }
+
         $upholstery = '';
         if ( $com ) { $upholstery .= 'COM: ' . esc_html( $com ) . '<br>'; }
         if ( $col ) { $upholstery .= 'COL: ' . esc_html( $col ) . '<br>'; }
-
-        // Image tag.
-        $img_tag = $image_url
-            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '">'
-            : '';
-
-        $specs_html = '';
-
-        if ( $dim_lines ) {
-            $specs_html .= '<p class="section-title">Dimensions</p><p class="section-body">' . $dim_lines . '</p>';
-        }
-        if ( $material ) {
-            $specs_html .= '<p class="section-title">Material</p><p class="section-body">' . esc_html( $material ) . '</p>';
-        }
-        if ( $finish ) {
-            $specs_html .= '<p class="section-title">Finish Shown</p><p class="section-body">' . esc_html( $finish ) . '</p>';
-        }
         if ( $upholstery ) {
-            $specs_html .= '<p class="section-title">Upholstery</p><p class="section-body">' . $upholstery . '</p>';
+            $specs_html .= $this->section( 'Notes', $upholstery );
         }
-        if ( $details ) {
-            $specs_html .= '<p class="section-title">Details</p><p class="section-body">' . esc_html( $details ) . '</p>';
-        }
+
         if ( $lead_time ) {
-            $specs_html .= '<p class="section-title">Estimated Lead Time</p><p class="section-body">' . esc_html( $lead_time ) . '</p>';
+            $specs_html .= $this->section( 'Estimated Lead Time', esc_html( $lead_time ) );
         }
 
         $sku_html = $sku ? '<span class="product-sku">' . $sku . '</span>' : '';
+        $img_tag  = $image_url
+            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '">'
+            : '';
+
+        $email = esc_html( self::BRAND_EMAIL );
+        $site  = esc_html( self::BRAND_SITE );
 
         return <<<HTML
         <div class="brand">{$collection}</div>
@@ -310,12 +273,13 @@ class Tearsheet_Generator {
         </table>
 
         <div class="footer">
-          {$this->esc_html_const( self::BRAND_EMAIL )} &nbsp;&nbsp;|&nbsp;&nbsp; {$this->esc_html_const( self::BRAND_SITE )}
+          {$email} &nbsp;&nbsp;|&nbsp;&nbsp; {$site}
         </div>
         HTML;
     }
 
-    private function esc_html_const( string $v ): string {
-        return esc_html( $v );
+    private function section( string $title, string $body ): string {
+        return '<p class="section-title">' . esc_html( $title ) . '</p>'
+             . '<p class="section-body">' . $body . '</p>';
     }
 }
