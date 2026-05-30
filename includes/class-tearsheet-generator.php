@@ -208,27 +208,24 @@ class Tearsheet_Generator {
 
         $sku_html = $sku ? $sku : '';
         $img_tag  = $image_url
-            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '">'
+            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '" style="max-width:100%;max-height:200mm;">'
             : '';
 
         $s = 'color:#1a1a1a;font-family:sans-serif;';
 
         return <<<HTML
+        <div style="position:fixed;bottom:25mm;right:18mm;width:55%;text-align:right;">
+          {$img_tag}
+        </div>
+
         <div class="brand">{$brand}</div>
 
-        <table class="body-table">
-          <tr>
-            <td class="col-specs">
-              <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:0;">{$name}</p>
-              <p style="{$s}font-size:10pt;font-weight:normal;margin-bottom:5mm;">{$sku_html}</p>
-              <p style="{$s}font-size:10pt;margin-bottom:5mm;">Available in custom sizes and finishes.</p>
-              {$specs_html}
-            </td>
-            <td class="col-image">
-              {$img_tag}
-            </td>
-          </tr>
-        </table>
+        <div style="width:42%;">
+          <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:0;">{$name}</p>
+          <p style="{$s}font-size:10pt;font-weight:normal;margin-bottom:5mm;">{$sku_html}</p>
+          <p style="{$s}font-size:10pt;margin-bottom:5mm;">Available in custom sizes and finishes.</p>
+          {$specs_html}
+        </div>
         HTML;
     }
 
