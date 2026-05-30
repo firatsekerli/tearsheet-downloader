@@ -221,7 +221,7 @@ class Tearsheet_Generator {
         <div class="brand">{$brand}</div>
 
         <div style="width:42%;">
-          <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:5mm;">{$name} {$sku_html}</p>
+          <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:5mm;white-space:nowrap;">{$name} &nbsp;{$sku_html}</p>
           <p style="{$s}font-size:10pt;margin-bottom:5mm;">Available in custom sizes and finishes.</p>
           {$specs_html}
         </div>
