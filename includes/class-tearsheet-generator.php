@@ -117,17 +117,12 @@ class Tearsheet_Generator {
 
     private function css(): string {
         return <<<CSS
-        * { box-sizing: border-box; margin: 0; padding: 0; color: #1a1a1a; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: sans-serif;
             font-size: 10pt;
             color: #1a1a1a;
-        }
-
-        a, a:link, a:visited {
-            color: #1a1a1a !important;
-            text-decoration: none !important;
         }
 
         .brand {
@@ -140,60 +135,23 @@ class Tearsheet_Generator {
             margin-bottom: 22px;
         }
 
-        .body-table {
-            width: 100%;
-        }
+        .body-table { width: 100%; }
 
         .col-specs {
-            width: 40%;
+            width: 45%;
             vertical-align: top;
-            padding-right: 12px;
+            padding-right: 14px;
         }
 
         .col-image {
-            width: 60%;
+            width: 55%;
             vertical-align: bottom;
             text-align: right;
         }
 
         .col-image img {
             max-width: 100%;
-            max-height: 210mm;
-        }
-
-        .product-header {
-            font-size: 16pt;
-            font-weight: bold;
-            color: #1a1a1a;
-            margin-bottom: 6px;
-            line-height: 1.2;
-        }
-
-        .product-sku {
-            font-size: 16pt;
-            font-weight: normal;
-            color: #1a1a1a;
-            margin-left: 10px;
-        }
-
-        .product-tagline {
-            font-size: 10.5pt;
-            color: #1a1a1a;
-            margin-bottom: 16px;
-        }
-
-        .section-title {
-            font-weight: bold;
-            font-size: 10pt;
-            color: #1a1a1a;
-            margin-top: 14px;
-            margin-bottom: 6px;
-        }
-
-        .section-body {
-            font-size: 10pt;
-            color: #1a1a1a;
-            line-height: 1.6;
+            max-height: 215mm;
         }
         CSS;
     }
@@ -248,10 +206,12 @@ class Tearsheet_Generator {
             $specs_html .= $this->section( 'Details', nl2br( esc_html( $notes ) ) );
         }
 
-        $sku_html = $sku ? ' <span class="product-sku">' . $sku . '</span>' : '';
+        $sku_html = $sku ? ' <span style="font-weight:normal;">' . $sku . '</span>' : '';
         $img_tag  = $image_url
             ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '">'
             : '';
+
+        $s = 'color:#1a1a1a;font-family:sans-serif;';
 
         return <<<HTML
         <div class="brand">{$brand}</div>
@@ -259,8 +219,8 @@ class Tearsheet_Generator {
         <table class="body-table">
           <tr>
             <td class="col-specs">
-              <p class="product-header">{$name}{$sku_html}</p>
-              <p class="product-tagline">Available in custom sizes and finishes.</p>
+              <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:5px;line-height:1.3;">{$name}{$sku_html}</p>
+              <p style="{$s}font-size:10pt;margin-bottom:16px;"">Available in custom sizes and finishes.</p>
               {$specs_html}
             </td>
             <td class="col-image">
@@ -272,7 +232,10 @@ class Tearsheet_Generator {
     }
 
     private function section( string $title, string $body ): string {
-        return '<p class="section-title">' . esc_html( $title ) . '</p>'
-             . '<p class="section-body">' . $body . '</p>';
+        $base  = 'color:#1a1a1a;font-family:sans-serif;font-size:10pt;';
+        $title_style = $base . 'font-weight:bold;margin-top:13px;margin-bottom:4px;';
+        $body_style  = $base . 'line-height:1.6;margin-bottom:2px;';
+        return '<p style="' . $title_style . '">' . esc_html( $title ) . '</p>'
+             . '<p style="' . $body_style  . '">' . $body . '</p>';
     }
 }
