@@ -4,7 +4,7 @@
  * Plugin URI:  https://github.com/firatsekerli/download-tearsheet
  * Description: Generates a branded PDF tearsheet for WooCommerce products via the Download button on the product page.
  * Version:     1.0.0
- * Author:      Quatrain
+ * Author:      MKS Web Design
  * Text Domain: tearsheet-downloader
  * Requires at least: 6.0
  * Requires PHP: 8.0
