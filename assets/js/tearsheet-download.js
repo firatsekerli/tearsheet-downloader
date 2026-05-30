@@ -12,8 +12,7 @@
      * Adjust SELECTORS below if your theme uses a different class or markup.
      */
     var SELECTORS = [
-        'a.tearsheet-download',
-        'button.tearsheet-download',
+        '.tearsheet-download',
         '[data-action="tearsheet"]',
         '.product-actions a[title*="ownload"]',
         '.woocommerce-product-actions a[title*="ownload"]',
