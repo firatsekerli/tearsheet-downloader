@@ -8,16 +8,12 @@ use Mpdf\Config\FontVariables;
 /**
  * Builds and streams the tearsheet PDF for a given WooCommerce product.
  *
- * Data sources:
- *   - Brand (main title) : WooCommerce Brands taxonomy (product_brand)
- *   - Product name       : WC product title
- *   - SKU                : WC product SKU
- *   - All specs          : existing ACF fields (see field names below)
- *
  * ACF field names used:
  *   construction_notes   → Details
  *   material             → Material
  *   finish_shown         → Finish Shown
+ *   upholstery_com       → Upholstery COM
+ *   upholstery_col       → Upholstery COL
  *   dim_width            → Width
  *   dim_depth            → Depth
  *   dim_height           → Height
@@ -42,6 +38,20 @@ class Tearsheet_Generator {
 
     public function stream(): void {
         $mpdf = $this->make_mpdf();
+
+        $email = esc_html( self::BRAND_EMAIL );
+        $site  = esc_html( self::BRAND_SITE );
+
+        $mpdf->SetHTMLFooter( <<<HTML
+        <table width="100%" style="border-top:1px solid #333;padding-top:6px;">
+          <tr>
+            <td style="text-align:center;font-family:serif;font-size:9pt;color:#444;">
+              {$email} &nbsp;&nbsp;|&nbsp;&nbsp; {$site}
+            </td>
+          </tr>
+        </table>
+        HTML );
+
         $mpdf->WriteHTML( $this->css(), 1 );
         $mpdf->WriteHTML( $this->html(), 2 );
 
@@ -61,16 +71,17 @@ class Tearsheet_Generator {
         return new Mpdf( [
             'mode'          => 'utf-8',
             'format'        => 'A4',
-            'margin_top'    => 18,
-            'margin_bottom' => 20,
-            'margin_left'   => 18,
-            'margin_right'  => 18,
+            'margin_top'    => 20,
+            'margin_bottom' => 22,
+            'margin_left'   => 20,
+            'margin_right'  => 20,
+            'margin_footer' => 8,
             'fontDir'       => array_merge(
                 $default_config['fontDir'],
                 [ TEARSHEET_DIR . 'assets/fonts/' ]
             ),
             'fontdata'      => $default_font_config['fontdata'],
-            'default_font'  => 'helvetica',
+            'default_font'  => 'serif',
             'tempDir'       => sys_get_temp_dir() . '/tearsheet_mpdf',
         ] );
     }
@@ -92,7 +103,6 @@ class Tearsheet_Generator {
         return $src ? $src[0] : '';
     }
 
-    /** Brand name from WooCommerce Brands taxonomy. */
     private function brand(): string {
         $terms = get_the_terms( $this->post_id, 'product_brand' );
         if ( $terms && ! is_wp_error( $terms ) ) {
@@ -110,20 +120,24 @@ class Tearsheet_Generator {
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: helvetica, sans-serif;
+            font-family: serif;
             font-size: 10pt;
             color: #1a1a1a;
         }
 
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
         .brand {
             text-align: center;
-            font-size: 28pt;
+            font-family: serif;
+            font-size: 26pt;
             font-weight: normal;
-            letter-spacing: 4px;
             font-variant: small-caps;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #333;
-            margin-bottom: 20px;
+            letter-spacing: 2px;
+            margin-bottom: 18px;
         }
 
         .body-table {
@@ -131,13 +145,13 @@ class Tearsheet_Generator {
         }
 
         .col-specs {
-            width: 42%;
+            width: 40%;
             vertical-align: top;
-            padding-right: 14px;
+            padding-right: 12px;
         }
 
         .col-image {
-            width: 58%;
+            width: 60%;
             vertical-align: top;
             text-align: right;
         }
@@ -147,45 +161,47 @@ class Tearsheet_Generator {
             max-height: 210mm;
         }
 
+        .product-header {
+            margin-bottom: 4px;
+        }
+
         .product-name {
-            font-size: 14pt;
+            font-family: sans-serif;
+            font-size: 12pt;
             font-weight: bold;
-            margin-bottom: 2px;
+            color: #1a1a1a;
         }
 
         .product-sku {
-            font-size: 11pt;
+            font-family: sans-serif;
+            font-size: 10pt;
             font-weight: normal;
-            margin-left: 14px;
+            color: #1a1a1a;
+            margin-left: 16px;
         }
 
         .product-tagline {
-            font-style: italic;
+            font-family: sans-serif;
             font-size: 9pt;
-            color: #555;
-            margin-top: 4px;
-            margin-bottom: 16px;
+            color: #1a1a1a;
+            margin-top: 2px;
+            margin-bottom: 14px;
         }
 
         .section-title {
+            font-family: sans-serif;
             font-weight: bold;
             font-size: 10pt;
-            margin-top: 12px;
-            margin-bottom: 3px;
+            color: #1a1a1a;
+            margin-top: 14px;
+            margin-bottom: 2px;
         }
 
         .section-body {
+            font-family: sans-serif;
             font-size: 10pt;
-            line-height: 1.6;
-        }
-
-        .footer {
-            text-align: center;
-            font-size: 9pt;
-            color: #555;
-            border-top: 1px solid #333;
-            padding-top: 6px;
-            margin-top: 16px;
+            color: #1a1a1a;
+            line-height: 1.5;
         }
         CSS;
     }
@@ -200,7 +216,6 @@ class Tearsheet_Generator {
         $brand     = $this->brand();
         $image_url = $this->image_url();
 
-        // ACF fields.
         $notes       = $this->f( 'construction_notes' );
         $material    = $this->f( 'material' );
         $finish      = $this->f( 'finish_shown' );
@@ -208,6 +223,8 @@ class Tearsheet_Generator {
         $depth       = $this->f( 'dim_depth' );
         $height      = $this->f( 'dim_height' );
         $seat_height = $this->f( 'dim_seat_height' );
+        $uph_com     = $this->f( 'upholstery_com' );
+        $uph_col     = $this->f( 'upholstery_col' );
 
         $specs_html = '';
 
@@ -228,6 +245,13 @@ class Tearsheet_Generator {
             $specs_html .= $this->section( 'Finish Shown', esc_html( $finish ) );
         }
 
+        $uph_lines = '';
+        if ( $uph_com ) { $uph_lines .= 'COM: ' . esc_html( $uph_com ) . '<br>'; }
+        if ( $uph_col ) { $uph_lines .= 'COL: ' . esc_html( $uph_col ) . '<br>'; }
+        if ( $uph_lines ) {
+            $specs_html .= $this->section( 'Upholstery', $uph_lines );
+        }
+
         if ( $notes ) {
             $specs_html .= $this->section( 'Details', nl2br( esc_html( $notes ) ) );
         }
@@ -237,16 +261,15 @@ class Tearsheet_Generator {
             ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '">'
             : '';
 
-        $email = esc_html( self::BRAND_EMAIL );
-        $site  = esc_html( self::BRAND_SITE );
-
         return <<<HTML
         <div class="brand">{$brand}</div>
 
         <table class="body-table">
           <tr>
             <td class="col-specs">
-              <p class="product-name">{$name}{$sku_html}</p>
+              <p class="product-header">
+                <span class="product-name">{$name}</span>{$sku_html}
+              </p>
               <p class="product-tagline">Available in custom sizes and finishes.</p>
               {$specs_html}
             </td>
@@ -255,10 +278,6 @@ class Tearsheet_Generator {
             </td>
           </tr>
         </table>
-
-        <div class="footer">
-          {$email} &nbsp;&nbsp;|&nbsp;&nbsp; {$site}
-        </div>
         HTML;
     }
 
