@@ -220,7 +220,7 @@ class Tearsheet_Generator {
           <tr>
             <td class="col-specs">
               <p style="{$s}font-size:13pt;font-weight:bold;margin-bottom:5px;line-height:1.3;">{$name}{$sku_html}</p>
-              <p style="{$s}font-size:10pt;margin-bottom:16px;"">Available in custom sizes and finishes.</p>
+              <p style="{$s}font-size:10pt;margin-bottom:16px;">Available in custom sizes and finishes.</p>
               {$specs_html}
             </td>
             <td class="col-image">
