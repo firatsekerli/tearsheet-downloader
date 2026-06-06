@@ -208,13 +208,13 @@ class Tearsheet_Generator {
 
         $sku_html = $sku ? $sku : '';
         $img_tag  = $image_url
-            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '" style="max-width:100%;max-height:230mm;">'
+            ? '<img src="' . esc_url( $image_url ) . '" alt="' . esc_attr( $name ) . '" style="max-width:100%;max-height:250mm;">'
             : '';
 
         $s = 'color:#1a1a1a;font-family:sans-serif;';
 
         return <<<HTML
-        <div style="position:fixed;bottom:25mm;right:18mm;width:55%;text-align:right;">
+        <div style="position:fixed;bottom:25mm;right:18mm;width:62%;text-align:right;">
           {$img_tag}
         </div>
 
